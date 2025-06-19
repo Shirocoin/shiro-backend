@@ -17,7 +17,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const GAME_SHORT_NAME = 'ShiroCoinDash';
 
 // URL donde está alojado tu juego (la misma que usaste en BotFather)
-const GAME_URL = "https://elegante-stroopwafel-713eff.netlify.app";
+const GAME_URL = "https://graceful-stroopwafel-713eff.netlify.app";
 
 // Comprobación de que el token existe antes de crear el bot
 if (!BOT_TOKEN) {
