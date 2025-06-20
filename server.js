@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN; 
-const GAME_SHORT_NAME = 'shirocoin';
+const GAME_SHORT_NAME = 'ShiroCoinDash';
 const GAME_URL = "https://graceful-stroopwafel-713eff.netlify.app/";
 
 if (!BOT_TOKEN) {
