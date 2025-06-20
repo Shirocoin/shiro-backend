@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 10000;
 // ✅ CONFIGURACIÓN CORREGIDA
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN; 
 const GAME_SHORT_NAME = 'ShiroCoinDash';
+// ✅ REEMPLAZA ESTA URL CON LA CORRECTA DE TU NETLIFY
 const GAME_URL = "https://graceful-stroopwafel-713eff.netlify.app";
 
 if (!BOT_TOKEN) {
@@ -67,25 +68,15 @@ bot.on('callback_query', async (query) => {
 // ✅ COMANDO /ranking COMPLETAMENTE CORREGIDO
 bot.onText(/\/ranking/, async (msg) => {
     const chatId = msg.chat.id;
-    console.log(`Comando /ranking solicitado por chat: ${chatId}`);
+    const userId = msg.from.id;
+    console.log(`Comando /ranking solicitado por chat: ${chatId}, usuario: ${userId}`);
     
     try {
-        // Obtenemos el message_id del juego enviado previamente
-        const gameMessageId = gameMessages.get(chatId);
+        // ✅ USAMOS EL USERID EN LUGAR DEL MESSAGE_ID
+        console.log(`Obteniendo ranking para usuario: ${userId}`);
         
-        if (!gameMessageId) {
-            await bot.sendMessage(chatId, 
-                "❌ Primero debes jugar al menos una vez. Usa /start para empezar.");
-            return;
-        }
-
-        console.log(`Obteniendo ranking con messageId: ${gameMessageId}`);
-        
-        // ✅ LLAMADA CORREGIDA A getGameHighScores
-        const highScores = await bot.getGameHighScores(msg.from.id, {
-            chat_id: chatId,
-            message_id: gameMessageId
-        });
+        // ✅ LLAMADA CORRECTA SIN MESSAGE_ID
+        const highScores = await bot.getGameHighScores(userId);
         
         console.log(`Respuesta de Telegram:`, highScores);
         
