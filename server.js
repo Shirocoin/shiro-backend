@@ -72,11 +72,22 @@ bot.onText(/\/ranking/, async (msg) => {
     console.log(`Comando /ranking solicitado por chat: ${chatId}, usuario: ${userId}`);
     
     try {
-        // ✅ USAMOS EL USERID EN LUGAR DEL MESSAGE_ID
-        console.log(`Obteniendo ranking para usuario: ${userId}`);
+        // ✅ NECESITAMOS EL MESSAGE_ID DEL JUEGO
+        const gameMessageId = gameMessages.get(chatId);
         
-        // ✅ LLAMADA CORRECTA SIN MESSAGE_ID
-        const highScores = await bot.getGameHighScores(userId);
+        if (!gameMessageId) {
+            await bot.sendMessage(chatId, 
+                "❌ Primero debes jugar al menos una vez. Usa /start para empezar.");
+            return;
+        }
+
+        console.log(`Obteniendo ranking con messageId: ${gameMessageId}`);
+        
+        // ✅ LLAMADA CORRECTA CON MESSAGE_ID Y CHAT_ID
+        const highScores = await bot.getGameHighScores(userId, {
+            chat_id: chatId,
+            message_id: gameMessageId
+        });
         
         console.log(`Respuesta de Telegram:`, highScores);
         
