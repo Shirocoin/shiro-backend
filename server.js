@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN; 
-const GAME_SHORT_NAME = 'ShiroCoinDash';
+const GAME_SHORT_NAME = 'shirocoin';
 const GAME_URL = "https://graceful-stroopwafel-713eff.netlify.app/";
 
 if (!BOT_TOKEN) {
@@ -209,6 +209,35 @@ bot.onText(/\/mystats/, (msg) => {
         "🎮 Usa /start para jugar de nuevo";
     
     bot.sendMessage(chatId, statsText, { parse_mode: 'Markdown' });
+});
+
+// ✅ ENDPOINT PARA RECIBIR PUNTUACIONES DEL JUEGO
+app.post("/submit-score", (req, res) => {
+    console.log("📊 Puntuación recibida del juego:", req.body);
+    
+    const { user_id, username, first_name, score } = req.body;
+    
+    if (!user_id || score === undefined) {
+        console.error("❌ Datos incompletos:", req.body);
+        return res.status(400).json({ error: "Faltan datos requeridos" });
+    }
+    
+    // Actualizar puntuación usando la función existente
+    const success = updateUserScore(user_id, username, first_name, score);
+    
+    if (success) {
+        console.log(`✅ Puntuación registrada: ${first_name} - ${score} puntos`);
+        
+        res.json({ 
+            success: true, 
+            message: "Puntuación registrada correctamente",
+            score: score,
+            player: first_name
+        });
+    } else {
+        console.error("❌ Error guardando puntuación");
+        res.status(500).json({ error: "Error guardando puntuación" });
+    }
 });
 
 // Ruta web principal
