@@ -54,6 +54,7 @@ function updateUserScore(userId, username, firstName, newScore) {
             scores[existingIndex].score = newScore;
             scores[existingIndex].updated_at = new Date().toISOString();
             console.log(`Puntuación actualizada para ${firstName}: ${newScore}`);
+            return true;
         } else {
             console.log(`Nueva puntuación ${newScore} no supera el récord actual de ${firstName}: ${scores[existingIndex].score}`);
             return false;
@@ -69,9 +70,8 @@ function updateUserScore(userId, username, firstName, newScore) {
             updated_at: new Date().toISOString()
         });
         console.log(`Nueva puntuación registrada para ${firstName}: ${newScore}`);
+        return true;
     }
-    
-    return saveScores(scores);
 }
 
 // ✅ COMANDO /start - Envía el juego
@@ -105,40 +105,75 @@ bot.on('callback_query', (query) => {
     }
 });
 
-// ✅ RECIBIR PUNTUACIONES - Maneja los datos del juego
+// ✅ NUEVO: RECIBIR PUNTUACIONES VIA sendData
+bot.on('web_app_data', (msg) => {
+    console.log('📊 Datos recibidos de WebApp:', msg.web_app_data.data);
+    
+    try {
+        const gameData = JSON.parse(msg.web_app_data.data);
+        
+        if (gameData.action === 'game_score') {
+            console.log(`🎮 Procesando puntuación: ${gameData.score} de ${msg.from.first_name}`);
+            
+            const success = updateUserScore(
+                msg.from.id,
+                msg.from.username || msg.from.first_name,
+                msg.from.first_name,
+                gameData.score
+            );
+            
+            if (success) {
+                bot.sendMessage(msg.chat.id, 
+                    `🎯 ¡Puntuación registrada!\n` +
+                    `Jugador: ${msg.from.first_name}\n` +
+                    `Puntos: ${gameData.score}\n\n` +
+                    `Usa /ranking para ver el top 10`
+                );
+                console.log(`✅ Mensaje de confirmación enviado a ${msg.from.first_name}`);
+            } else {
+                bot.sendMessage(msg.chat.id, 
+                    `📊 Puntuación: ${gameData.score}\n` +
+                    `No superaste tu récord anterior.\n\n` +
+                    `Usa /ranking para ver el top 10`
+                );
+                console.log(`📊 Puntuación no superó récord previo: ${msg.from.first_name}`);
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error procesando datos del juego:', error);
+    }
+});
+
+// ✅ RECIBIR PUNTUACIONES - Maneja los datos del juego (método alternativo)
 bot.on('message', (msg) => {
     // Manejar datos enviados desde el juego
     if (msg.web_app_data) {
+        console.log('📊 Datos recibidos via message.web_app_data:', msg.web_app_data.data);
+        
         try {
             const gameData = JSON.parse(msg.web_app_data.data);
-            console.log('Datos recibidos del juego:', gameData);
             
-            if (gameData.action === 'set_score') {
+            if (gameData.action === 'game_score') {
+                console.log(`🎮 Procesando puntuación (método alternativo): ${gameData.score} de ${msg.from.first_name}`);
+                
                 const success = updateUserScore(
-                    gameData.user_id,
-                    gameData.username,
+                    msg.from.id,
+                    msg.from.username || msg.from.first_name,
                     msg.from.first_name,
                     gameData.score
                 );
                 
                 if (success) {
-                    // Enviar confirmación al usuario
                     bot.sendMessage(msg.chat.id, 
                         `🎯 ¡Puntuación registrada!\n` +
                         `Jugador: ${msg.from.first_name}\n` +
                         `Puntos: ${gameData.score}\n\n` +
                         `Usa /ranking para ver el top 10`
                     );
-                } else {
-                    bot.sendMessage(msg.chat.id, 
-                        `📊 Puntuación: ${gameData.score}\n` +
-                        `No superaste tu récord anterior.\n\n` +
-                        `Usa /ranking para ver el top 10`
-                    );
                 }
             }
         } catch (error) {
-            console.error('Error procesando datos del juego:', error);
+            console.error('❌ Error procesando datos del juego (método alternativo):', error);
         }
     }
 });
