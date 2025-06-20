@@ -6,7 +6,7 @@ const PORT = process.env.PORT || 10000;
 // ✅ CONFIGURACIÓN CORREGIDA
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN; 
 const GAME_SHORT_NAME = 'ShiroCoinDash';
-const GAME_URL = "https://elegante-stroopwafel-713eff.netlify.app";
+const GAME_URL = "https://graceful-stroopwafel-713eff.netlify.app";
 
 if (!BOT_TOKEN) {
     console.error("ERROR: Token de Telegram Bot no configurado.");
