@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 // ¡ASEGÚRATE DE CONFIGURAR ESTA VARIABLE EN LA INTERFAZ DE RENDER!
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN; 
 
-// El "short name" de tu juego, tal como lo muestra BotFather en la Share URL, es 'shirocoin' (sin guion bajo).
+// El "short name" de tu juego, tal como lo muestra BotFather en la Share URL, es 'ShiroCoinDash'.
 // ASEGÚRATE DE QUE ESTO COINCIDE EXACTAMENTE CON EL QUE REGISTRASTE EN BOTFATHER.
 const GAME_SHORT_NAME = 'ShiroCoinDash';
 
@@ -171,7 +171,7 @@ bot.on('callback_query', (query) => {
 
 
 // 3. Manejar las actualizaciones de puntuación de los juegos
-// Cuando tu juego (main (5).js) llama a TelegramGameProxy.setScore(score, true),
+// Cuando tu juego (main.js) llama a TelegramGameProxy.setScore(score, true),
 // Telegram ACTUALIZA AUTOMÁTICAMENTE el mensaje del juego con el ranking.
 // Este bot.on('message') es más para logging o procesamiento adicional.
 bot.on('message', (msg) => {
@@ -193,10 +193,12 @@ bot.onText(/\/ranking/, async (msg) => {
     const userId = msg.from.id; // ID del usuario que envió el comando
 
     try {
-        // Obtener el ranking global del juego para el usuario que envía el comando.
-        // Esta es la forma más sencilla y robusta para un comando /ranking.
-        console.log(`Intentando obtener ranking para userId: ${userId}, gameShortName: ${GAME_SHORT_NAME}`);
-        const highScores = await bot.getGameHighScores(userId, GAME_SHORT_NAME);
+        // Los parámetros correctos son: userId (obligatorio), y un objeto de opciones
+        // con 'chat_id' y 'message_id' para un ranking específico,
+        // o simplemente el 'game_short_name' para el ranking global.
+        // La forma más robusta para el comando /ranking es solo con el userId y el game_short_name
+        // PERO, para evitar el error 'Cannot create property user_id on string', pasamos un objeto vacío como segundo argumento.
+        const highScores = await bot.getGameHighScores(userId, undefined, { game_short_name: GAME_SHORT_NAME });
 
         let rankingText = "🏆 **Ranking Shiro Coin** 🏆\n\n";
         if (highScores && highScores.length > 0) {
