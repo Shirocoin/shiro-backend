@@ -7,7 +7,9 @@ const PORT = process.env.PORT || 10000;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN; 
 const GAME_SHORT_NAME = 'ShiroCoinDash';
 // ✅ REEMPLAZA ESTA URL CON LA CORRECTA DE TU NETLIFY
-const GAME_URL = "https://graceful-stroopwafel-713eff.netlify.app";
+const GAME_URL = "https://graceful-stroopwafel-713eff.netlify.app
+
+";
 
 if (!BOT_TOKEN) {
     console.error("ERROR: Token de Telegram Bot no configurado.");
@@ -28,27 +30,31 @@ app.listen(PORT, () => {
   console.log(`✅ Servidor escuchando en puerto ${PORT}`);
 });
 
-// ✅ COMANDO /start MEJORADO
+// ✅ COMANDO /start CON KEYBOARD BUTTON (NO INLINE)
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   console.log(`Comando /start del chat: ${chatId}`);
 
+  // ✅ USAR KEYBOARD NORMAL PARA QUE sendData() FUNCIONE
   const keyboard = {
-    inline_keyboard: [[{ text: '🎮 Jugar Shiro Coin', callback_game: {}}]]
+    keyboard: [[{ text: '🎮 Jugar Shiro Coin', web_app: { url: GAME_URL } }]],
+    resize_keyboard: true,
+    one_time_keyboard: true
   };
 
   try {
-    const sentMessage = await bot.sendGame(chatId, GAME_SHORT_NAME, { 
-      reply_markup: keyboard 
-    });
+    const sentMessage = await bot.sendMessage(chatId, 
+      'Bienvenido a Shiro Coin! 🎮\n\nUsa el botón de abajo para jugar:', 
+      { reply_markup: keyboard }
+    );
     
     // ✅ GUARDAR MESSAGE_ID PARA EL RANKING
     gameMessages.set(chatId, sentMessage.message_id);
-    console.log(`✅ Juego enviado. MessageID: ${sentMessage.message_id}`);
+    console.log(`✅ Mini App enviada. MessageID: ${sentMessage.message_id}`);
     
   } catch (error) {
-    console.error("❌ Error enviando juego:", error.message);
-    bot.sendMessage(chatId, "Error al iniciar el juego. Verifica la configuración del bot.");
+    console.error("❌ Error enviando Mini App:", error.message);
+    bot.sendMessage(chatId, "Error al iniciar el juego. Intenta de nuevo.");
   }
 });
 
@@ -137,8 +143,49 @@ bot.onText(/\/ranking/, async (msg) => {
     }
 });
 
-// ✅ LISTENER PARA ACTUALIZACIONES DE SCORE
+// ✅ LISTENER PARA MINI APPS - CORREGIDO
 bot.on('message', (msg) => {
+    // ✅ DETECTAR DATOS DE MINI APP
+    if (msg.web_app_data) {
+        console.log('📡 Datos recibidos de Mini App:', msg.web_app_data.data);
+        try {
+            const appData = JSON.parse(msg.web_app_data.data);
+            console.log('🎮 Datos parseados:', appData);
+            
+            if (appData.action === 'setGameScore' && appData.score !== undefined) {
+                const chatId = msg.chat.id;
+                const userId = msg.from.id;
+                const score = parseInt(appData.score);
+                const messageId = gameMessages.get(chatId);
+                
+                console.log(`🎯 Registrando score Mini App:`);
+                console.log(`   Usuario: ${userId}`);
+                console.log(`   Score: ${score}`);
+                console.log(`   Chat: ${chatId}`);
+                console.log(`   MessageID: ${messageId}`);
+                
+                if (messageId) {
+                    // ✅ REGISTRAR SCORE OFICIALMENTE
+                    bot.setGameScore(userId, score, {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        force: true // Permitir scores menores
+                    }).then((result) => {
+                        console.log(`✅ Score ${score} registrado oficialmente para usuario ${userId}`);
+                        console.log('📋 Resultado:', result);
+                    }).catch(error => {
+                        console.error('❌ Error registrando score:', error.message);
+                        console.error('📋 Detalles del error:', error);
+                    });
+                } else {
+                    console.error('❌ No se encontró messageId para el chat:', chatId);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error parseando datos de Mini App:', error);
+        }
+    }
+    
     // Detectar cuando se actualiza una puntuación del juego
     if (msg.game_score !== undefined) {
         const chatId = msg.chat.id;
