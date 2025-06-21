@@ -15,7 +15,36 @@ if (!BOT_TOKEN) {
 app.use(express.json());
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
+// 🏆 SISTEMA DE RANKINGS INTERNO
+let rankings = {};
 let gameMessages = new Map();
+
+// ✅ FUNCIÓN PARA ACTUALIZAR RANKING
+function updateRanking(userId, username, score) {
+    if (!rankings[userId] || rankings[userId].score < score) {
+        rankings[userId] = {
+            username: username || 'Usuario',
+            score: score,
+            lastUpdate: new Date().toISOString()
+        };
+        console.log(`🏆 Ranking actualizado: ${username} - ${score} puntos`);
+        return true;
+    }
+    return false;
+}
+
+// ✅ FUNCIÓN PARA OBTENER TOP RANKINGS
+function getTopRankings(limit = 10) {
+    return Object.entries(rankings)
+        .map(([userId, data]) => ({
+            userId,
+            username: data.username,
+            score: data.score,
+            lastUpdate: data.lastUpdate
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+}
 
 app.get("/", (req, res) => {
   console.log("Redirigiendo al juego...");
@@ -24,20 +53,32 @@ app.get("/", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ Servidor escuchando en puerto ${PORT}`);
+  console.log(`🎮 Juego: ${GAME_SHORT_NAME}`);
+  console.log(`🌐 URL: ${GAME_URL}`);
 });
 
+// ✅ COMANDO /start
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  const username = msg.from.username || msg.from.first_name || 'Usuario';
   
   console.log(`Comando /start del chat: ${chatId}, usuario: ${userId}`);
 
   const keyboard = {
-    inline_keyboard: [[{ text: '🎮 Jugar Shiro Coin', callback_game: {}}]]
+    inline_keyboard: [[{ 
+      text: '🎮 Jugar Shiro Coin', 
+      web_app: { url: GAME_URL } 
+    }]]
   };
 
   try {
-    const sentMessage = await bot.sendGame(chatId, GAME_SHORT_NAME, { 
+    const welcomeMessage = `🐱 ¡Hola ${username}! Bienvenido a Shiro Coin Game! 🪙
+
+🎮 ¡Haz clic en el botón para jugar!
+🏆 Usa /ranking para ver las mejores puntuaciones`;
+
+    const sentMessage = await bot.sendMessage(chatId, welcomeMessage, { 
       reply_markup: keyboard 
     });
     
@@ -46,154 +87,94 @@ bot.onText(/\/start/, async (msg) => {
       userId: userId
     });
     
-    console.log(`✅ Juego enviado. Chat: ${chatId}, MessageID: ${sentMessage.message_id}, Usuario: ${userId}`);
+    console.log(`✅ Mini App enviado. Chat: ${chatId}, Usuario: ${userId}`);
     
   } catch (error) {
-    console.error("❌ Error enviando juego:", error.message);
+    console.error("❌ Error enviando Mini App:", error.message);
     bot.sendMessage(chatId, "Error al iniciar el juego. Verifica la configuración del bot.");
   }
 });
 
-bot.on('callback_query', async (query) => {
-  const chatId = query.message.chat.id;
-  const userId = query.from.id;
-  
-  console.log(`Callback query de ${query.from.first_name || 'Usuario'} (ID: ${userId})`);
-
-  if (query.game_short_name === GAME_SHORT_NAME) {
-    const gameInfo = gameMessages.get(chatId);
-    if (gameInfo) {
-      gameInfo.currentUserId = userId;
-      gameMessages.set(chatId, gameInfo);
-    }
-    
-    console.log(`✅ Abriendo juego para usuario ${userId}: ${GAME_URL}`);
-    await bot.answerCallbackQuery(query.id, { url: GAME_URL });
-  } else {
-    await bot.answerCallbackQuery(query.id, { text: "Juego no disponible." });
-  }
-});
-
+// ✅ COMANDO /ranking
 bot.onText(/\/ranking/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     console.log(`Comando /ranking solicitado por chat: ${chatId}, usuario: ${userId}`);
     
-    try {
-        const gameInfo = gameMessages.get(chatId);
-        
-        if (!gameInfo || !gameInfo.messageId) {
-            await bot.sendMessage(chatId, 
-                "❌ Primero debes jugar al menos una vez. Usa /start para empezar.");
-            return;
-        }
-
-        console.log(`Obteniendo ranking con messageId: ${gameInfo.messageId}`);
-        
-        const highScores = await bot.getGameHighScores(userId, {
-            chat_id: chatId,
-            message_id: gameInfo.messageId
-        });
-        
-        console.log(`Respuesta de Telegram:`, highScores);
-        
-        let rankingText = "🏆 **RANKING SHIRO COIN** 🏆\n\n";
-        
-        if (highScores && highScores.length > 0) {
-            const sortedScores = highScores.sort((a, b) => b.score - a.score);
-            
-            sortedScores.forEach((entry, index) => {
-                const firstName = entry.user.first_name || 'Jugador';
-                const lastName = entry.user.last_name || '';
-                const fullName = `${firstName} ${lastName}`.trim();
-                
-                let medal = '';
-                if (index === 0) medal = '🥇';
-                else if (index === 1) medal = '🥈';
-                else if (index === 2) medal = '🥉';
-                else medal = `${index + 1}.`;
-                
-                rankingText += `${medal} ${fullName}: **${entry.score}** puntos\n`;
-            });
-        } else {
-            rankingText += "📭 Aún no hay puntuaciones registradas.\n";
-            rankingText += "¡Sé el primero en establecer un récord!";
-        }
-        
-        await bot.sendMessage(chatId, rankingText, { 
-            parse_mode: 'Markdown',
-            reply_to_message_id: msg.message_id 
-        });
-        
-        console.log("✅ Ranking enviado correctamente");
-        
-    } catch (error) {
-        console.error("❌ Error obteniendo ranking:", error);
-        
-        let errorMessage = "❌ No pude obtener el ranking.";
-        
-        if (error.code === 400) {
-            errorMessage += "\n\nAsegúrate de haber jugado al menos una vez usando /start";
-        } else if (error.code === 403) {
-            errorMessage += "\n\nPermisos insuficientes. Contacta al administrador.";
-        }
-        
-        await bot.sendMessage(chatId, errorMessage);
+    const topRankings = getTopRankings(10);
+    
+    if (topRankings.length === 0) {
+        await bot.sendMessage(chatId, '📊 El ranking está vacío. ¡Sé el primero en jugar!');
+        return;
     }
+    
+    let rankingText = '🏆 **RANKING SHIRO COIN** 🏆\n\n';
+    
+    topRankings.forEach((player, index) => {
+        const position = index + 1;
+        const medal = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '🏅';
+        rankingText += `${medal} ${position}. ${player.username} - ${player.score} puntos\n`;
+    });
+    
+    // Mostrar posición del usuario actual
+    if (rankings[userId]) {
+        const userRank = topRankings.findIndex(p => p.userId == userId) + 1;
+        if (userRank > 0) {
+            rankingText += `\n👤 Tu posición: #${userRank}`;
+        }
+    }
+    
+    await bot.sendMessage(chatId, rankingText, { parse_mode: 'Markdown' });
 });
 
+// ✅ COMANDO /testscore
 bot.onText(/\/testscore (\d+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    const userName = msg.from.first_name || 'Jugador';
+    const userName = msg.from.username || msg.from.first_name || 'Usuario';
     const score = parseInt(match[1]);
     
     console.log(`Comando /testscore: ${userName} quiere registrar ${score} puntos`);
     
-    try {
-        const gameInfo = gameMessages.get(chatId);
-        
-        if (!gameInfo || !gameInfo.messageId) {
-            await bot.sendMessage(chatId, "❌ Usa /start primero");
-            return;
-        }
-
-        await bot.setGameScore(userId, score, {
-            chat_id: chatId,
-            message_id: gameInfo.messageId,
-            force: false,
-            edit_message: false
-        });
-        
-        console.log(`✅ Score manual registrado: ${userName} = ${score}`);
+    const updated = updateRanking(userId, userName, score);
+    
+    if (updated) {
         await bot.sendMessage(chatId, `✅ Score de ${score} registrado para ${userName}!`);
-        
-    } catch (error) {
-        console.error("❌ Error registrando score manual:", error);
-        await bot.sendMessage(chatId, `❌ Error: ${error.message}`);
+    } else {
+        const currentScore = rankings[userId]?.score || 0;
+        await bot.sendMessage(chatId, `📊 Tu puntuación actual (${currentScore}) es mayor o igual.\nNecesitas más de ${currentScore} puntos para actualizar.`);
     }
 });
 
+// ✅ MANEJO DE DATOS DEL MINI APP
 bot.on('message', async (msg) => {
+    // 🔍 DEBUG: Ver todos los mensajes que llegan
+    console.log('📨 MENSAJE RECIBIDO TIPO:', msg.content_type || 'unknown');
+    
     if (msg.web_app_data) {
         console.log('📡 Datos recibidos de Mini App:', msg.web_app_data.data);
+        
         try {
             const appData = JSON.parse(msg.web_app_data.data);
+            console.log('📊 Datos parseados:', appData);
             
             if (appData.action === 'setGameScore' && appData.score !== undefined) {
                 const chatId = msg.chat.id;
                 const userId = msg.from.id;
+                const userName = msg.from.username || msg.from.first_name || 'Usuario';
                 const score = parseInt(appData.score);
-                const gameInfo = gameMessages.get(chatId);
                 
-                if (gameInfo && gameInfo.messageId) {
-                    await bot.setGameScore(userId, score, {
-                        chat_id: chatId,
-                        message_id: gameInfo.messageId,
-                        force: false,
-                        edit_message: false
-                    });
-                    console.log(`✅ Score ${score} registrado via Mini App`);
+                console.log(`🎯 Score recibido del juego: ${userName} = ${score}`);
+                
+                const updated = updateRanking(userId, userName, score);
+                
+                if (updated) {
+                    await bot.sendMessage(chatId, `🎉 ¡Nuevo récord! ${userName}: ${score} puntos\n\nUsa /ranking para ver tu posición.`);
+                    console.log(`✅ Score ${score} actualizado en ranking`);
+                } else {
+                    const currentScore = rankings[userId]?.score || 0;
+                    await bot.sendMessage(chatId, `🎮 Partida terminada: ${score} puntos\nTu récord actual: ${currentScore} puntos`);
+                    console.log(`📊 Score ${score} no supera el récord actual: ${currentScore}`);
                 }
             }
         } catch (error) {
@@ -201,39 +182,24 @@ bot.on('message', async (msg) => {
         }
     }
     
+    // ✅ SUPPORT PARA TELEGRAM GAMES (por si acaso)
     if (msg.game_score !== undefined) {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
-        const userName = msg.from.first_name || 'Jugador';
+        const userName = msg.from.username || msg.from.first_name || 'Usuario';
         const score = msg.game_score;
         
-        console.log(`🎯 Nueva puntuación registrada:`);
-        console.log(`   Chat: ${chatId}`);
-        console.log(`   Usuario: ${userName} (${userId})`);
-        console.log(`   Puntuación: ${score}`);
+        console.log(`🎯 Score recibido de Telegram Game: ${userName} = ${score}`);
         
-        try {
-            await bot.setGameScore(userId, score, {
-                chat_id: chatId,
-                message_id: msg.message_id,
-                force: false,
-                edit_message: false
-            });
-            console.log(`✅ Score ${score} actualizado en ranking`);
-        } catch (error) {
-            console.error(`❌ Error actualizando score:`, error.message);
-        }
+        const updated = updateRanking(userId, userName, score);
         
-        if (msg.message_id) {
-            const existing = gameMessages.get(chatId) || {};
-            gameMessages.set(chatId, {
-                ...existing,
-                messageId: msg.message_id
-            });
+        if (updated) {
+            await bot.sendMessage(chatId, `🎉 ¡Nuevo récord! ${userName}: ${score} puntos`);
         }
     }
 });
 
+// ✅ COMANDO /help
 bot.onText(/\/help/, async (msg) => {
     const chatId = msg.chat.id;
     const helpText = `
@@ -266,6 +232,5 @@ bot.on('error', (error) => {
 });
 
 console.log("🤖 Bot de Telegram iniciado correctamente");
-console.log(`🎮 Juego: ${GAME_SHORT_NAME}`);
-console.log(`🌐 URL: ${GAME_URL}`);
+console.log("📱 Configurado para Mini App");
 console.log("⏳ Esperando comandos...");
