@@ -15,7 +15,7 @@ if (!BOT_TOKEN) {
 app.use(express.json());
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// 🏆 SISTEMA DE RANKINGS INTERNO
+// 🏆 SISTEMA DE RANKINGS INTERNO (ÚNICO)
 let rankings = {};
 let gameMessages = new Map();
 
@@ -55,9 +55,10 @@ app.listen(PORT, () => {
   console.log(`✅ Servidor escuchando en puerto ${PORT}`);
   console.log(`🎮 Juego: ${GAME_SHORT_NAME}`);
   console.log(`🌐 URL: ${GAME_URL}`);
+  console.log("🏆 Usando SOLO ranking interno");
 });
 
-// ✅ COMANDO /start - USANDO GAME (NO MINI APP)
+// ✅ COMANDO /start - GAME SIMPLE
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
@@ -65,7 +66,6 @@ bot.onText(/\/start/, async (msg) => {
   
   console.log(`Comando /start del chat: ${chatId}, usuario: ${userId}`);
 
-  // ✅ BOTÓN DE GAME (NO MINI APP)
   const keyboard = {
     inline_keyboard: [[{ text: '🎮 Jugar Shiro Coin', callback_game: {} }]]
   };
@@ -80,7 +80,7 @@ bot.onText(/\/start/, async (msg) => {
       userId: userId
     });
     
-    console.log(`✅ Juego enviado. Chat: ${chatId}, MessageID: ${sentMessage.message_id}, Usuario: ${userId}`);
+    console.log(`✅ Juego enviado. Chat: ${chatId}, Usuario: ${userId}`);
     
   } catch (error) {
     console.error("❌ Error enviando juego:", error.message);
@@ -96,12 +96,6 @@ bot.on('callback_query', async (query) => {
   console.log(`Callback query de ${query.from.first_name || 'Usuario'} (ID: ${userId})`);
 
   if (query.game_short_name === GAME_SHORT_NAME) {
-    const gameInfo = gameMessages.get(chatId);
-    if (gameInfo) {
-      gameInfo.currentUserId = userId;
-      gameMessages.set(chatId, gameInfo);
-    }
-    
     console.log(`✅ Abriendo juego para usuario ${userId}: ${GAME_URL}`);
     await bot.answerCallbackQuery(query.id, { url: GAME_URL });
   } else {
@@ -109,7 +103,7 @@ bot.on('callback_query', async (query) => {
   }
 });
 
-// ✅ COMANDO /ranking - USANDO SISTEMA INTERNO
+// ✅ COMANDO /ranking - SOLO RANKING INTERNO
 bot.onText(/\/ranking/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -139,6 +133,7 @@ bot.onText(/\/ranking/, async (msg) => {
     }
     
     await bot.sendMessage(chatId, rankingText, { parse_mode: 'Markdown' });
+    console.log("✅ Ranking interno enviado");
 });
 
 // ✅ COMANDO /testscore
@@ -160,7 +155,7 @@ bot.onText(/\/testscore (\d+)/, async (msg, match) => {
     }
 });
 
-// ✅ MANEJO DE DATOS DEL JUEGO
+// ✅ MANEJO DE DATOS DEL JUEGO - TODO AL RANKING INTERNO
 bot.on('message', async (msg) => {
     // 🔍 DEBUG: Ver todos los mensajes que llegan
     console.log('📨 MENSAJE RECIBIDO TIPO:', msg.content_type || 'unknown');
@@ -179,13 +174,13 @@ bot.on('message', async (msg) => {
                 const userName = msg.from.username || msg.from.first_name || 'Usuario';
                 const score = parseInt(appData.score);
                 
-                console.log(`🎯 Score recibido del juego: ${userName} = ${score}`);
+                console.log(`🎯 Score recibido del juego (Mini App): ${userName} = ${score}`);
                 
                 const updated = updateRanking(userId, userName, score);
                 
                 if (updated) {
                     await bot.sendMessage(chatId, `🎉 ¡Nuevo récord! ${userName}: ${score} puntos\n\nUsa /ranking para ver tu posición.`);
-                    console.log(`✅ Score ${score} actualizado en ranking`);
+                    console.log(`✅ Score ${score} actualizado en ranking interno`);
                 } else {
                     const currentScore = rankings[userId]?.score || 0;
                     await bot.sendMessage(chatId, `🎮 Partida terminada: ${score} puntos\nTu récord actual: ${currentScore} puntos`);
@@ -197,7 +192,7 @@ bot.on('message', async (msg) => {
         }
     }
     
-    // ✅ DATOS DE TELEGRAM GAMES
+    // ✅ DATOS DE TELEGRAM GAMES - REDIRIGIR AL RANKING INTERNO
     if (msg.game_score !== undefined) {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
@@ -210,12 +205,15 @@ bot.on('message', async (msg) => {
         
         if (updated) {
             await bot.sendMessage(chatId, `🎉 ¡Nuevo récord! ${userName}: ${score} puntos\n\nUsa /ranking para ver tu posición.`);
-            console.log(`✅ Score ${score} actualizado en ranking`);
+            console.log(`✅ Score ${score} actualizado en ranking interno`);
         } else {
             const currentScore = rankings[userId]?.score || 0;
             await bot.sendMessage(chatId, `🎮 Partida terminada: ${score} puntos\nTu récord actual: ${currentScore} puntos`);
             console.log(`📊 Score ${score} no supera el récord actual: ${currentScore}`);
         }
+        
+        // ❌ NO USAR setGameScore - Solo ranking interno
+        console.log("🔄 Score procesado solo en ranking interno, no en Telegram Games");
     }
 });
 
@@ -227,7 +225,7 @@ bot.onText(/\/help/, async (msg) => {
 
 **Comandos disponibles:**
 /start - Iniciar el juego
-/ranking - Ver top puntuaciones
+/ranking - Ver top puntuaciones (ranking interno)
 /testscore [número] - Registrar score manualmente
 /help - Mostrar esta ayuda
 
@@ -238,6 +236,8 @@ bot.onText(/\/help/, async (msg) => {
 🎯 ¡Consigue la puntuación más alta!
 
 **Ejemplo:** /testscore 25
+
+**Sistema:** Ranking interno únicamente
     `;
     
     await bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
@@ -254,4 +254,5 @@ bot.on('error', (error) => {
 console.log("🤖 Bot de Telegram iniciado correctamente");
 console.log(`🎮 Configurado como GAME: ${GAME_SHORT_NAME}`);
 console.log(`🌐 URL: ${GAME_URL}`);
+console.log("🏆 Sistema de ranking: SOLO INTERNO");
 console.log("⏳ Esperando comandos...");
