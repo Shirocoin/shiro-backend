@@ -27,7 +27,7 @@ app.listen(PORT, () => {
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
-  
+
   const keyboard = {
     inline_keyboard: [[{ text: '🎮 Jugar Shiro Coin', callback_game: {}}]]
   };
@@ -36,14 +36,14 @@ bot.onText(/\/start/, async (msg) => {
     const sentMessage = await bot.sendGame(chatId, GAME_SHORT_NAME, { 
       reply_markup: keyboard 
     });
-    
+
     gameMessages.set(chatId, {
       messageId: sentMessage.message_id,
       userId: userId
     });
-    
+
     console.log(`Juego enviado a chat ${chatId}`);
-    
+
   } catch (error) {
     console.error("Error:", error.message);
   }
@@ -59,10 +59,10 @@ bot.onText(/\/testscore (\d+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const score = parseInt(match[1]);
-    
+
     try {
         const gameInfo = gameMessages.get(chatId);
-        
+
         if (!gameInfo) {
             await bot.sendMessage(chatId, "Usa /start primero");
             return;
@@ -73,9 +73,9 @@ bot.onText(/\/testscore (\d+)/, async (msg, match) => {
             message_id: gameInfo.messageId,
             force: true
         });
-        
+
         await bot.sendMessage(chatId, `Score ${score} registrado!`);
-        
+
     } catch (error) {
         await bot.sendMessage(chatId, `Error: ${error.message}`);
     }
@@ -84,10 +84,10 @@ bot.onText(/\/testscore (\d+)/, async (msg, match) => {
 bot.onText(/\/ranking/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    
+
     try {
         const gameInfo = gameMessages.get(chatId);
-        
+
         if (!gameInfo) {
             await bot.sendMessage(chatId, "Usa /start primero");
             return;
@@ -97,12 +97,12 @@ bot.onText(/\/ranking/, async (msg) => {
             chat_id: chatId,
             message_id: gameInfo.messageId
         });
-        
+
         let rankingText = "🏆 RANKING 🏆\n\n";
-        
+
         if (highScores && highScores.length > 0) {
             highScores.sort((a, b) => b.score - a.score);
-            
+
             highScores.forEach((entry, index) => {
                 const name = entry.user.first_name || 'Jugador';
                 rankingText += `${index + 1}. ${name}: ${entry.score}\n`;
@@ -110,9 +110,9 @@ bot.onText(/\/ranking/, async (msg) => {
         } else {
             rankingText += "Sin puntuaciones";
         }
-        
+
         await bot.sendMessage(chatId, rankingText);
-        
+
     } catch (error) {
         await bot.sendMessage(chatId, "Error obteniendo ranking");
     }
