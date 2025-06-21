@@ -1,7 +1,8 @@
+
 {
-  "name": "shirocoin-backend",
+  "name": "shiro-telegram-bot",
   "version": "1.0.0",
-  "description": "Backend para juego Telegram Shiro Coin",
+  "description": "Backend para redirigir al juego de Shiro Coin en Telegram",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
