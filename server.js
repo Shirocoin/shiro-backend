@@ -26,11 +26,13 @@ app.listen(PORT, () => {
   console.log(`✅ Servidor escuchando en puerto ${PORT}`);
 });
 
+// ✅ COMANDO /start CON REGISTRO AUTOMÁTICO DE SCORES DE PRUEBA
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  const userName = msg.from.first_name || 'Jugador';
   
-  console.log(`Comando /start del chat: ${chatId}, usuario: ${userId}`);
+  console.log(`Comando /start del chat: ${chatId}, usuario: ${userId} (${userName})`);
 
   const keyboard = {
     inline_keyboard: [[{ text: '🎮 Jugar Shiro Coin', callback_game: {}}]]
@@ -43,10 +45,36 @@ bot.onText(/\/start/, async (msg) => {
     
     gameMessages.set(chatId, {
       messageId: sentMessage.message_id,
-      userId: userId
+      userId: userId,
+      userName: userName
     });
     
-    console.log(`✅ Juego enviado. Chat: ${chatId}, MessageID: ${sentMessage.message_id}, Usuario: ${userId}`);
+    console.log(`✅ Juego enviado. Chat: ${chatId}, MessageID: ${sentMessage.message_id}, Usuario: ${userName}`);
+    
+    // ✅ REGISTRAR SCORES DE PRUEBA AUTOMÁTICAMENTE PARA MÚLTIPLES USUARIOS
+    setTimeout(async () => {
+      const testScores = [
+        { score: 5, name: userName },
+        { score: 8, name: `${userName}_Test1` },
+        { score: 12, name: `${userName}_Test2` },
+        { score: 15, name: `${userName}_Test3` }
+      ];
+      
+      for (const testData of testScores) {
+        try {
+          await bot.setGameScore(userId, testData.score, {
+            chat_id: chatId,
+            message_id: sentMessage.message_id,
+            force: true,
+            edit_message: true
+          });
+          console.log(`✅ Score de prueba registrado: ${testData.name} = ${testData.score}`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Esperar 1 segundo entre scores
+        } catch (error) {
+          console.log(`⚠️ Error score ${testData.score}:`, error.message);
+        }
+      }
+    }, 3000); // Esperar 3 segundos después de enviar el juego
     
   } catch (error) {
     console.error("❌ Error enviando juego:", error.message);
@@ -57,14 +85,32 @@ bot.onText(/\/start/, async (msg) => {
 bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const userId = query.from.id;
+  const userName = query.from.first_name || 'Jugador';
   
-  console.log(`Callback query de ${query.from.first_name || 'Usuario'} (ID: ${userId})`);
+  console.log(`Callback query de ${userName} (ID: ${userId})`);
 
   if (query.game_short_name === GAME_SHORT_NAME) {
     const gameInfo = gameMessages.get(chatId);
     if (gameInfo) {
       gameInfo.currentUserId = userId;
+      gameInfo.currentUserName = userName;
       gameMessages.set(chatId, gameInfo);
+      
+      // ✅ REGISTRAR SCORE AUTOMÁTICO CUANDO ALGUIEN CLICKEA JUGAR
+      setTimeout(async () => {
+        try {
+          const randomScore = Math.floor(Math.random() * 20) + 1; // Score entre 1 y 20
+          await bot.setGameScore(userId, randomScore, {
+            chat_id: chatId,
+            message_id: gameInfo.messageId,
+            force: true,
+            edit_message: true
+          });
+          console.log(`🎯 Score automático registrado: ${userName} = ${randomScore}`);
+        } catch (error) {
+          console.log(`⚠️ Error score automático:`, error.message);
+        }
+      }, 5000); // 5 segundos después de clickear jugar
     }
     
     console.log(`✅ Abriendo juego para usuario ${userId}: ${GAME_URL}`);
@@ -74,6 +120,7 @@ bot.on('callback_query', async (query) => {
   }
 });
 
+// ✅ COMANDO /ranking SIMPLIFICADO
 bot.onText(/\/ranking/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -95,7 +142,7 @@ bot.onText(/\/ranking/, async (msg) => {
             message_id: gameInfo.messageId
         });
         
-        console.log(`Respuesta de Telegram:`, highScores);
+        console.log(`Respuesta de Telegram:`, JSON.stringify(highScores, null, 2));
         
         let rankingText = "🏆 **RANKING SHIRO COIN** 🏆\n\n";
         
@@ -115,6 +162,8 @@ bot.onText(/\/ranking/, async (msg) => {
                 
                 rankingText += `${medal} ${fullName}: **${entry.score}** puntos\n`;
             });
+            
+            rankingText += `\n📊 Total jugadores: ${highScores.length}`;
         } else {
             rankingText += "📭 Aún no hay puntuaciones registradas.\n";
             rankingText += "¡Sé el primero en establecer un récord!";
@@ -139,6 +188,39 @@ bot.onText(/\/ranking/, async (msg) => {
         }
         
         await bot.sendMessage(chatId, errorMessage);
+    }
+});
+
+// ✅ COMANDO PARA SIMULAR SCORE MANUALMENTE
+bot.onText(/\/testscore (\d+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const userName = msg.from.first_name || 'Jugador';
+    const score = parseInt(match[1]);
+    
+    console.log(`Comando /testscore: ${userName} quiere registrar ${score} puntos`);
+    
+    try {
+        const gameInfo = gameMessages.get(chatId);
+        
+        if (!gameInfo || !gameInfo.messageId) {
+            await bot.sendMessage(chatId, "❌ Usa /start primero");
+            return;
+        }
+
+        await bot.setGameScore(userId, score, {
+            chat_id: chatId,
+            message_id: gameInfo.messageId,
+            force: true,
+            edit_message: true
+        });
+        
+        console.log(`✅ Score manual registrado: ${userName} = ${score}`);
+        await bot.sendMessage(chatId, `✅ Score de ${score} registrado para ${userName}!`);
+        
+    } catch (error) {
+        console.error("❌ Error registrando score manual:", error);
+        await bot.sendMessage(chatId, `❌ Error: ${error.message}`);
     }
 });
 
@@ -210,6 +292,7 @@ bot.onText(/\/help/, async (msg) => {
 **Comandos disponibles:**
 /start - Iniciar el juego
 /ranking - Ver top puntuaciones
+/testscore [número] - Registrar score manualmente
 /help - Mostrar esta ayuda
 
 **Cómo jugar:**
@@ -217,6 +300,8 @@ bot.onText(/\/help/, async (msg) => {
 🔴 Evita otras monedas (-1 punto)
 ⏰ Tienes 90 segundos
 🎯 ¡Consigue la puntuación más alta!
+
+**Ejemplo:** /testscore 25
     `;
     
     await bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
@@ -227,10 +312,4 @@ bot.on('polling_error', (error) => {
 });
 
 bot.on('error', (error) => {
-  console.error(`❌ Error del bot:`, error);
-});
-
-console.log("🤖 Bot de Telegram iniciado correctamente");
-console.log(`🎮 Juego: ${GAME_SHORT_NAME}`);
-console.log(`🌐 URL: ${GAME_URL}`);
-console.log("⏳ Esperando comandos...");
+  console.error(`❌ E
