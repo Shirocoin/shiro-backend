@@ -214,10 +214,10 @@ bot.on('message', async (msg) => {
         
         try {
             await bot.setGameScore(userId, score, {
-                chat_id: chatId,
-                message_id: msg.message_id,
-                force: true,
-                edit_message: true
+    chat_id: chatId,
+    message_id: gameInfo.messageId,
+    force: false,         ← Cambiar a false
+    edit_message: false   ← Cambiar a false
             });
             console.log(`✅ Score ${score} actualizado en ranking con force: true`);
         } catch (error) {
