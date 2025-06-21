@@ -57,7 +57,7 @@ app.listen(PORT, () => {
   console.log(`🌐 URL: ${GAME_URL}`);
 });
 
-// ✅ COMANDO /start
+// ✅ COMANDO /start - USANDO GAME (NO MINI APP)
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
@@ -65,20 +65,13 @@ bot.onText(/\/start/, async (msg) => {
   
   console.log(`Comando /start del chat: ${chatId}, usuario: ${userId}`);
 
+  // ✅ BOTÓN DE GAME (NO MINI APP)
   const keyboard = {
-    inline_keyboard: [[{ 
-      text: '🎮 Jugar Shiro Coin', 
-      web_app: { url: GAME_URL } 
-    }]]
+    inline_keyboard: [[{ text: '🎮 Jugar Shiro Coin', callback_game: {} }]]
   };
 
   try {
-    const welcomeMessage = `🐱 ¡Hola ${username}! Bienvenido a Shiro Coin Game! 🪙
-
-🎮 ¡Haz clic en el botón para jugar!
-🏆 Usa /ranking para ver las mejores puntuaciones`;
-
-    const sentMessage = await bot.sendMessage(chatId, welcomeMessage, { 
+    const sentMessage = await bot.sendGame(chatId, GAME_SHORT_NAME, { 
       reply_markup: keyboard 
     });
     
@@ -87,15 +80,36 @@ bot.onText(/\/start/, async (msg) => {
       userId: userId
     });
     
-    console.log(`✅ Mini App enviado. Chat: ${chatId}, Usuario: ${userId}`);
+    console.log(`✅ Juego enviado. Chat: ${chatId}, MessageID: ${sentMessage.message_id}, Usuario: ${userId}`);
     
   } catch (error) {
-    console.error("❌ Error enviando Mini App:", error.message);
+    console.error("❌ Error enviando juego:", error.message);
     bot.sendMessage(chatId, "Error al iniciar el juego. Verifica la configuración del bot.");
   }
 });
 
-// ✅ COMANDO /ranking
+// ✅ MANEJO DE CALLBACK QUERIES
+bot.on('callback_query', async (query) => {
+  const chatId = query.message.chat.id;
+  const userId = query.from.id;
+  
+  console.log(`Callback query de ${query.from.first_name || 'Usuario'} (ID: ${userId})`);
+
+  if (query.game_short_name === GAME_SHORT_NAME) {
+    const gameInfo = gameMessages.get(chatId);
+    if (gameInfo) {
+      gameInfo.currentUserId = userId;
+      gameMessages.set(chatId, gameInfo);
+    }
+    
+    console.log(`✅ Abriendo juego para usuario ${userId}: ${GAME_URL}`);
+    await bot.answerCallbackQuery(query.id, { url: GAME_URL });
+  } else {
+    await bot.answerCallbackQuery(query.id, { text: "Juego no disponible." });
+  }
+});
+
+// ✅ COMANDO /ranking - USANDO SISTEMA INTERNO
 bot.onText(/\/ranking/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -146,11 +160,12 @@ bot.onText(/\/testscore (\d+)/, async (msg, match) => {
     }
 });
 
-// ✅ MANEJO DE DATOS DEL MINI APP
+// ✅ MANEJO DE DATOS DEL JUEGO
 bot.on('message', async (msg) => {
     // 🔍 DEBUG: Ver todos los mensajes que llegan
     console.log('📨 MENSAJE RECIBIDO TIPO:', msg.content_type || 'unknown');
     
+    // ✅ DATOS DE MINI APP
     if (msg.web_app_data) {
         console.log('📡 Datos recibidos de Mini App:', msg.web_app_data.data);
         
@@ -182,7 +197,7 @@ bot.on('message', async (msg) => {
         }
     }
     
-    // ✅ SUPPORT PARA TELEGRAM GAMES (por si acaso)
+    // ✅ DATOS DE TELEGRAM GAMES
     if (msg.game_score !== undefined) {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
@@ -194,7 +209,12 @@ bot.on('message', async (msg) => {
         const updated = updateRanking(userId, userName, score);
         
         if (updated) {
-            await bot.sendMessage(chatId, `🎉 ¡Nuevo récord! ${userName}: ${score} puntos`);
+            await bot.sendMessage(chatId, `🎉 ¡Nuevo récord! ${userName}: ${score} puntos\n\nUsa /ranking para ver tu posición.`);
+            console.log(`✅ Score ${score} actualizado en ranking`);
+        } else {
+            const currentScore = rankings[userId]?.score || 0;
+            await bot.sendMessage(chatId, `🎮 Partida terminada: ${score} puntos\nTu récord actual: ${currentScore} puntos`);
+            console.log(`📊 Score ${score} no supera el récord actual: ${currentScore}`);
         }
     }
 });
@@ -232,5 +252,6 @@ bot.on('error', (error) => {
 });
 
 console.log("🤖 Bot de Telegram iniciado correctamente");
-console.log("📱 Configurado para Mini App");
+console.log(`🎮 Configurado como GAME: ${GAME_SHORT_NAME}`);
+console.log(`🌐 URL: ${GAME_URL}`);
 console.log("⏳ Esperando comandos...");
