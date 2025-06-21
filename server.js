@@ -17,6 +17,32 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 let gameMessages = new Map();
 
+// ✅ DETECTAR CUANDO ALGUIEN COMPARTE SCORE
+bot.on('chosen_inline_result', async (result) => {
+    console.log('🎯 Score compartido detectado:', JSON.stringify(result, null, 2));
+    
+    const userId = result.from.id;
+    const userName = result.from.first_name || 'Jugador';
+    
+    console.log(`📊 Usuario ${userName} (${userId}) compartió su score`);
+});
+
+bot.on('inline_query', async (query) => {
+    console.log('🔍 Inline query detectada:', JSON.stringify(query, null, 2));
+    
+    const userId = query.from.id;
+    const userName = query.from.first_name || 'Jugador';
+    
+    console.log(`📤 Usuario ${userName} (${userId}) está compartiendo`);
+    
+    // Responder a la query inline (requerido)
+    try {
+        await bot.answerInlineQuery(query.id, []);
+    } catch (error) {
+        console.log('Error respondiendo inline query:', error.message);
+    }
+});
+
 app.get("/", (req, res) => {
   console.log("Redirigiendo al juego...");
   res.redirect(GAME_URL);
@@ -146,22 +172,36 @@ bot.onText(/\/testscore (\d+)/, async (msg, match) => {
         });
         
         console.log(`Score manual registrado: ${userName} = ${score}`);
-        await bot.sendMessage(chatId, `Score de ${score} registrado para ${userName}!`);
+        await bot.sendMessage(chatId, `✅ Score de ${score} registrado para ${userName}!`);
         
     } catch (error) {
         console.error("Error registrando score manual:", error);
-        await bot.sendMessage(chatId, `Error: ${error.message}`);
+        await bot.sendMessage(chatId, `❌ Error: ${error.message}`);
     }
 });
 
+// ✅ DETECTAR TODOS LOS TIPOS DE MENSAJES POSIBLES
 bot.on('message', async (msg) => {
+    console.log('📩 Mensaje recibido:', {
+        type: msg.chat.type,
+        from: msg.from?.first_name,
+        game_score: msg.game_score,
+        text: msg.text,
+        content_type: Object.keys(msg).filter(key => key !== 'message_id' && key !== 'date' && key !== 'chat' && key !== 'from')
+    });
+
+    // Detectar actualizaciones de score automáticas
     if (msg.game_score !== undefined) {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
         const userName = msg.from.first_name || 'Jugador';
         const score = msg.game_score;
         
-        console.log(`Nueva puntuación: Usuario ${userName} (${userId}), Puntuación: ${score}`);
+        console.log(`🎯 SCORE AUTOMÁTICO DETECTADO:`);
+        console.log(`   Usuario: ${userName} (${userId})`);
+        console.log(`   Score: ${score}`);
+        console.log(`   Chat: ${chatId}`);
+        console.log(`   MessageID: ${msg.message_id}`);
         
         try {
             await bot.setGameScore(userId, score, {
@@ -170,51 +210,11 @@ bot.on('message', async (msg) => {
                 force: true,
                 edit_message: true
             });
-            console.log(`Score ${score} actualizado en ranking`);
+            console.log(`✅ Score ${score} actualizado en ranking automáticamente`);
         } catch (error) {
-            console.error(`Error actualizando score:`, error.message);
+            console.error(`❌ Error actualizando score automático:`, error.message);
         }
         
+        // Actualizar mapping de messageId
         if (msg.message_id) {
-            const existing = gameMessages.get(chatId) || {};
-            gameMessages.set(chatId, {
-                ...existing,
-                messageId: msg.message_id
-            });
-        }
-    }
-});
-
-bot.onText(/\/help/, async (msg) => {
-    const chatId = msg.chat.id;
-    const helpText = `🎮 SHIRO COIN GAME
-
-Comandos disponibles:
-/start - Iniciar el juego
-/ranking - Ver top puntuaciones
-/testscore [número] - Registrar score manualmente
-/help - Mostrar esta ayuda
-
-Cómo jugar:
-🟡 Recoge monedas Shiro (+2 puntos)
-🔴 Evita otras monedas (-1 punto)
-⏰ Tienes 90 segundos
-🎯 Consigue la puntuación más alta!
-
-Ejemplo: /testscore 25`;
-    
-    await bot.sendMessage(chatId, helpText);
-});
-
-bot.on('polling_error', (error) => {
-  console.error(`Error de polling: ${error.code} - ${error.message}`);
-});
-
-bot.on('error', (error) => {
-  console.error(`Error del bot:`, error);
-});
-
-console.log("Bot de Telegram iniciado correctamente");
-console.log(`Juego: ${GAME_SHORT_NAME}`);
-console.log(`URL: ${GAME_URL}`);
-console.log("Esperando comandos...");
+            const existing = gameMessages.get(chatId
