@@ -161,8 +161,8 @@ bot.onText(/\/testscore (\d+)/, async (msg, match) => {
         await bot.setGameScore(userId, score, {
             chat_id: chatId,
             message_id: gameInfo.messageId,
-            force: true,
-            edit_message: true
+            force: false,
+            edit_message: false
         });
         
         console.log(`✅ Score manual registrado: ${userName} = ${score}`);
@@ -190,8 +190,8 @@ bot.on('message', async (msg) => {
                     await bot.setGameScore(userId, score, {
                         chat_id: chatId,
                         message_id: gameInfo.messageId,
-                        force: true,
-                        edit_message: true
+                        force: false,
+                        edit_message: false
                     });
                     console.log(`✅ Score ${score} registrado via Mini App`);
                 }
@@ -214,12 +214,12 @@ bot.on('message', async (msg) => {
         
         try {
             await bot.setGameScore(userId, score, {
-    chat_id: chatId,
-    message_id: gameInfo.messageId,
-    force: false,         ← Cambiar a false
-    edit_message: false   ← Cambiar a false
+                chat_id: chatId,
+                message_id: msg.message_id,
+                force: false,
+                edit_message: false
             });
-            console.log(`✅ Score ${score} actualizado en ranking con force: true`);
+            console.log(`✅ Score ${score} actualizado en ranking`);
         } catch (error) {
             console.error(`❌ Error actualizando score:`, error.message);
         }
